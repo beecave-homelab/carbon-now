@@ -4,12 +4,12 @@ set -euo pipefail
 # ------------------------------------------
 # Script: carbon-url-builder.sh
 # Description: Generates a Carbon Now URL for creating code snippet images.
-# Author: elvee
-# Version: 0.3.0
+# Author: [Your Name]
+# Version: 1.4.0
 # License: MIT
-# Creation Date: 11-09-2024
-# Last Modified: 11-09-2024
-# Usage: ./carbon-now.sh [OPTIONS]
+# Creation Date: [dd/mm/yyyy]
+# Last Modified: [dd/mm/yyyy]
+# Usage: ./carbon-url-builder.sh [OPTIONS]
 # ------------------------------------------
 
 # Constants
@@ -69,11 +69,9 @@ show_info() {
     echo "  Watermark           : $DEFAULT_WATERMARK"
     echo "  Window Theme        : $DEFAULT_WINDOW_THEME"
     echo
-    echo "Example for embedding with default config values:"
-    echo "  ./carbon-now.sh -i 'print(\"Hello, World!\")' -e"
-    echo
-    echo "Example for using a config file:"
-    echo "  ./carbon-now.sh --input /path/to/code.py --config config/custom-onelight.json"
+    echo "Examples:"
+    echo "  ./carbon-url-builder.sh -i 'print(\"Hello, World!\")' -e"
+    echo "  ./carbon-url-builder.sh --input /path/to/code.py --config config.json"
 }
 
 # Function to URL encode a given input
@@ -110,8 +108,8 @@ build_url() {
     
     # URL encode the code and other parameters
     encoded_code=$(url_encode "$code")
-    encoded_font_family=$(url_encode "$font_family")
-    encoded_theme=$(url_encode "$theme")
+    encoded_font_family=$(url_encode("$font_family"))
+    encoded_theme=$(url_encode("$theme"))
 
     # Base Carbon URL with customizable parameters
     local base_url="https://carbon.now.sh/"
@@ -138,14 +136,16 @@ build_url() {
             echo "Error: xclip is not installed. Please copy the URL manually."
         fi
     fi
+
+    # Return the generated URL for further processing if needed
+    echo "$full_url"
 }
 
 # Function to generate embedding URL
 generate_embedding_url() {
-    local url="$1"
-    # Extract the ID from the original Carbon URL (assuming the URL format is correct)
-    local id="${url##*/}"
-    local embed_url="https://carbon.now.sh/embed/?${id}"
+    local full_url="$1"
+    # Replace the base URL with the embedding URL base
+    local embed_url="${full_url/https:\/\/carbon.now.sh/https:\/\/carbon.now.sh\/embed\/:}"
 
     echo "Generated Embedding URL:"
     echo "$embed_url"
@@ -242,7 +242,7 @@ main() {
     read -p "Enter comma-separated line numbers to highlight (e.g., 2,3,4): " lines_to_highlight
 
     # Build and display the Carbon URL
-    build_url "$code" "$lines_to_highlight" "$background_color" "$font_family" "$font_size" "$theme"
+    full_url=$(build_url "$code" "$lines_to_highlight" "$background_color" "$font_family" "$font_size" "$theme")
 
     # If embedding flag is set, generate the embedding URL
     if [[ "$embedding_flag" == true ]]; then
