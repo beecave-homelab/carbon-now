@@ -4,12 +4,12 @@ set -euo pipefail
 # ------------------------------------------
 # Script: carbon-url-builder.sh
 # Description: Generates a Carbon Now URL for creating code snippet images.
-# Author: [Your Name]
-# Version: 1.4.0
+# Author: elvee
+# Version: 0.4.0
 # License: MIT
-# Creation Date: [dd/mm/yyyy]
-# Last Modified: [dd/mm/yyyy]
-# Usage: ./carbon-url-builder.sh [OPTIONS]
+# Creation Date: 11-09-2024
+# Last Modified: 11-09-2024
+# Usage: ./carbon-now.sh [OPTIONS]
 # ------------------------------------------
 
 # Constants
@@ -48,7 +48,7 @@ ascii_art() {
 show_info() {
     ascii_art
     echo
-    echo "Usage: carbon-url-builder.sh [OPTIONS]"
+    echo "Usage: ./carbon-now.sh [OPTIONS]"
     echo
     echo "Options:"
     echo "  -i, --input    - A string representing the code snippet or a path to a file containing the code."
@@ -70,8 +70,8 @@ show_info() {
     echo "  Window Theme        : $DEFAULT_WINDOW_THEME"
     echo
     echo "Examples:"
-    echo "  ./carbon-url-builder.sh -i 'print(\"Hello, World!\")' -e"
-    echo "  ./carbon-url-builder.sh --input /path/to/code.py --config config.json"
+    echo "  ./carbon-now.sh -i 'print(\"Hello, World!\")' -e"
+    echo "  ./carbon-now.sh --input /path/to/code.py --config config.json"
 }
 
 # Function to URL encode a given input
