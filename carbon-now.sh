@@ -13,17 +13,18 @@ set -euo pipefail
 # ------------------------------------------
 
 # Constants
-DEFAULT_BG="rgba(0, 0, 0, 1)"
+DEFAULT_BG="#FFFFFF"
 DEFAULT_FONT="Fira Code"
-DEFAULT_SIZE="15px"
+DEFAULT_SIZE="16px"
 DEFAULT_THEME="one-light"
 DEFAULT_EXPORT_SIZE="4x"
 DEFAULT_PADDING_VERTICAL="0px"
 DEFAULT_PADDING_HORIZONTAL="0px"
 DEFAULT_LINE_HEIGHT="133%"
-DEFAULT_LINE_NUMBERS=false
+DEFAULT_LINE_NUMBERS=true
 DEFAULT_WATERMARK=false
 DEFAULT_WINDOW_THEME="none"
+DEFAULT_LANGUAGE="auto"
 
 # Function to display ASCII art
 ascii_art() {
@@ -48,7 +49,7 @@ ascii_art() {
 show_info() {
     ascii_art
     echo
-    echo "Usage: ./carbon-now.sh [OPTIONS]"
+    echo "Usage: $0 [OPTIONS]"
     echo
     echo "Options:"
     echo "  -i, --input    - A string representing the code snippet or a path to a file containing the code."
@@ -68,16 +69,29 @@ show_info() {
     echo "  Export Size         : $DEFAULT_EXPORT_SIZE"
     echo "  Watermark           : $DEFAULT_WATERMARK"
     echo "  Window Theme        : $DEFAULT_WINDOW_THEME"
+    echo "  Language            : $DEFAULT_LANGUAGE"
     echo
     echo "Examples:"
-    echo "  ./carbon-now.sh -i 'print(\"Hello, World!\")' -e"
-    echo "  ./carbon-now.sh --input /path/to/code.py --config config.json"
+    echo "  $0 -i 'print(\"Hello, World!\")' -e"
+    echo "  $0 --input /path/to/code.py --config config/custom-onelight.json"
 }
 
-# Function to URL encode a given input
+# Function to URL encode a given input with double encoding for special cases
 url_encode() {
     local data="$1"
-    echo -n "$data" | jq -s -R -r @uri
+    local double_encode="$2"
+
+    if [[ "$double_encode" == "true" ]]; then
+        # First encode spaces and special characters
+        local first_encode=$(echo -n "$data" | perl -pe 's/([^A-Za-z0-9])/sprintf("%%%02X", ord($1))/ge')
+        # Then encode the % signs
+        local second_encode=$(echo -n "$first_encode" | perl -pe 's/%/\%25/g')
+        # Finally encode newlines to %250A and ensure there's one at the end
+        echo -n "$second_encode" | perl -pe 's/\n/%250A/g' && echo -n "%250A"
+    else
+        # Single encode for other parameters
+        echo -n "$data" | perl -pe 's/([^A-Za-z0-9])/sprintf("%%%02X", ord($1))/ge'
+    fi
 }
 
 # Function to parse the JSON config file
@@ -86,15 +100,16 @@ parse_json_config() {
     
     padding_vertical=$(jq -r '.paddingVertical // "0px"' "$config_file")
     padding_horizontal=$(jq -r '.paddingHorizontal // "0px"' "$config_file")
-    background_color=$(jq -r '.backgroundColor // "rgba(0, 0, 0, 1)"' "$config_file")
+    background_color=$(jq -r '.backgroundColor // "#FFFFFF"' "$config_file")
     theme=$(jq -r '.theme // "one-light"' "$config_file")
     font_family=$(jq -r '.fontFamily // "Fira Code"' "$config_file")
-    font_size=$(jq -r '.fontSize // "15px"' "$config_file")
+    font_size=$(jq -r '.fontSize // "16px"' "$config_file")
     line_height=$(jq -r '.lineHeight // "133%"' "$config_file")
-    line_numbers=$(jq -r '.lineNumbers // false' "$config_file")
+    line_numbers=$(jq -r '.lineNumbers // true' "$config_file")
     export_size=$(jq -r '.exportSize // "4x"' "$config_file")
     watermark=$(jq -r '.watermark // false' "$config_file")
     window_theme=$(jq -r '.windowTheme // "none"' "$config_file")
+    language=$(jq -r '.language // "auto"' "$config_file")
 }
 
 # Function to build the Carbon URL
@@ -105,15 +120,21 @@ build_url() {
     local font_family="$4"
     local font_size="$5"
     local theme="$6"
+    local language="$7"
     
-    # URL encode the code and other parameters
-    encoded_code=$(url_encode "$code")
-    encoded_font_family=$(url_encode("$font_family"))
-    encoded_theme=$(url_encode("$theme"))
+    # Double URL encode the code content
+    encoded_code=$(url_encode "$code" "true")
+    # Single URL encode other parameters
+    encoded_font_family=$(url_encode "$font_family" "false")
+    encoded_theme=$(url_encode "$theme" "false")
+    encoded_line_height=$(url_encode "$line_height" "false")
+    encoded_language=$(url_encode "$language" "false")
+    # Encode the background color's # symbol
+    encoded_bg=$(echo -n "$background_color" | sed 's/#/%23/')
 
     # Base Carbon URL with customizable parameters
     local base_url="https://carbon.now.sh/"
-    local full_url="${base_url}?bg=${background_color}&code=${encoded_code}&ds=false&dsblur=68px&dsyoff=20px&es=${export_size}&fm=${encoded_font_family}&fs=${font_size}&highlight=true&l=auto&ln=${line_numbers}&ph=${padding_horizontal}&pv=${padding_vertical}&save=false&si=false&sl=${lines_to_highlight}&t=${encoded_theme}&type=png&wa=true&wc=false&wm=${watermark}&wt=${window_theme}"
+    local full_url="${base_url}?bg=${encoded_bg}&code=${encoded_code}&ds=false&dsblur=68px&dsyoff=20px&es=${export_size}&fl=1&fm=${encoded_font_family}&fs=${font_size}&l=${encoded_language}&lh=${encoded_line_height}&ln=false&ph=${padding_horizontal}&pv=${padding_vertical}&si=false&sl=%2A&t=one-light&type=png&wa=true&wc=true&wm=false&wt=none"
 
     echo "Generated Carbon URL:"
     echo "$full_url"
@@ -129,11 +150,14 @@ build_url() {
             echo "Error: Could not open the URL. Please open it manually." >&2
         fi
     elif [[ "$action_choice" == "c" ]]; then
-        if command -v xclip &> /dev/null; then
+        if command -v pbcopy &> /dev/null; then
+            echo -n "$full_url" | pbcopy
+            echo "URL copied to clipboard."
+        elif command -v xclip &> /dev/null; then
             echo -n "$full_url" | xclip -selection clipboard
             echo "URL copied to clipboard."
         else
-            echo "Error: xclip is not installed. Please copy the URL manually."
+            echo "Error: Neither pbcopy nor xclip is installed. Please copy the URL manually."
         fi
     fi
 
@@ -175,13 +199,25 @@ main() {
     local code=""
     local config_file=""
     local embedding_flag=false
+    local language="$DEFAULT_LANGUAGE"
 
     # Parse command-line arguments
     while [[ "$#" -gt 0 ]]; do
         case "$1" in
             -i|--input)
                 if [[ -f "$2" ]]; then
+                    # Read the file contents, not just the filename
                     code=$(cat "$2")
+                    # Detect language from file extension
+                    file_ext="${2##*.}"
+                    case "$file_ext" in
+                        "md") language="markdown" ;;
+                        "js") language="javascript" ;;
+                        "py") language="python" ;;
+                        "sh") language="shell" ;;
+                        "json") language="application/json" ;;
+                        *) language="auto" ;;
+                    esac
                 else
                     code="$2"
                 fi
@@ -242,7 +278,7 @@ main() {
     read -p "Enter comma-separated line numbers to highlight (e.g., 2,3,4): " lines_to_highlight
 
     # Build and display the Carbon URL
-    full_url=$(build_url "$code" "$lines_to_highlight" "$background_color" "$font_family" "$font_size" "$theme")
+    full_url=$(build_url "$code" "$lines_to_highlight" "$background_color" "$font_family" "$font_size" "$theme" "$language")
 
     # If embedding flag is set, generate the embedding URL
     if [[ "$embedding_flag" == true ]]; then
